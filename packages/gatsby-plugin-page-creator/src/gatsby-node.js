@@ -9,7 +9,6 @@ const glob = Promise.promisify(globCB)
 
 const createPath = require(`./create-path`)
 const validatePath = require(`./validate-path`)
-const ignorePath = require(`./ignore-path`)
 const slash = require(`slash`)
 
 // Path creator.
@@ -19,7 +18,7 @@ const slash = require(`slash`)
 // takes control of that page component in gatsby-node.
 exports.createPagesStatefully = async (
   { store, actions, reporter },
-  { path: pagesPath, pathCheck = true, ignore },
+  { path: pagesPath, pathCheck = true },
   doneCb
 ) => {
   const { createPage, deletePage } = actions
@@ -49,20 +48,19 @@ exports.createPagesStatefully = async (
     )
   }
 
-  const pagesDirectory = slash(systemPath.posix.join(pagesPath))
+  const pagesDirectory = systemPath.posix.join(pagesPath)
   const pagesGlob = `${pagesDirectory}/**/*.{${exts}}`
 
   // Get initial list of files.
   let files = await glob(pagesGlob)
-  files.forEach(file => _createPage(file, pagesDirectory, createPage, ignore))
+  files.forEach(file => _createPage(file, pagesDirectory, createPage))
 
   // Listen for new component pages to be added or removed.
   chokidar
     .watch(pagesGlob)
     .on(`add`, path => {
-      path = slash(path)
       if (!_.includes(files, path)) {
-        _createPage(path, pagesDirectory, createPage, ignore)
+        _createPage(path, pagesDirectory, createPage)
         files.push(path)
       }
     })
@@ -81,15 +79,10 @@ exports.createPagesStatefully = async (
     })
     .on(`ready`, () => doneCb())
 }
-const _createPage = (filePath, pagesDirectory, createPage, ignore) => {
+const _createPage = (filePath, pagesDirectory, createPage) => {
   // Filter out special components that shouldn't be made into
   // pages.
   if (!validatePath(systemPath.posix.relative(pagesDirectory, filePath))) {
-    return
-  }
-
-  // Filter out anything matching the given ignore patterns and options
-  if (ignorePath(systemPath.posix.relative(pagesDirectory, filePath), ignore)) {
     return
   }
 
